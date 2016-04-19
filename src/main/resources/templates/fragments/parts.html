@@ -1,0 +1,95 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+</head>
+
+<body>
+
+
+	<div th:fragment="metrics" class="dropdown">
+
+		<form id="eventForm" method="post" th:action="@{/events}"
+			class="form-horizontal">
+
+			<div class="form-group">
+				<label class="col-xs-3 control-label">Metrics</label>
+				<div class="col-xs-5 selectContainer">
+					<select class="form-control" name="metric">
+						<option th:each="metric: ${metrics}" th:attr="id=${metric}"
+							th:text="${metric}">METRIC</option>
+					</select>
+				</div>
+			</div>
+
+			<div th:each="tag: ${tags}" class="form-group">
+				<label class="col-xs-3 control-label" th:text="${tag.key}">TAG</label>
+				<div class="col-xs-5">
+					<div class="checkbox-inline" th:each="value: ${tag.value}">
+						<label> <input type="checkbox"
+							th:attr="value=${value}, name=${tag.key}" th:text="${value}" />
+						</label>
+					</div>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label class="col-xs-3 control-label">Amount</label>
+				<div class="col-xs-5 selectContainer">
+					<input type="number" min="1" step="1" value="1" name="amount"
+						required="true" id="amount" />
+				</div>
+			</div>
+
+			<div class="form-group">
+				<label class="col-xs-3 control-label">Relative (Ago)</label>
+				<div class="col-xs-5 selectContainer">
+					<label class="radio-inline active"> <input checked="true"
+						type="radio" name="unit" id="unitH" value="h"> Hour(s) </input>
+					</label> <label class="radio-inline"> <input type="radio"
+						name="unit" id="unitM" value="m"> Minute(s) </input>
+					</label> <label class="radio-inline"> <input type="radio"
+						name="unit" id="unitS" value="s"> Second(s) </input>
+					</label>
+				</div>
+			</div>
+
+			<div class="form-group">
+				<div class="col-xs-5 col-xs-offset-3">
+					<a type="submit" href="javascript: graph()"
+						class="btn btn-primary center-block">Graph</a>
+					<!--  <button type="submit" class="btn btn-default">Graph</button>  -->
+				</div>
+			</div>
+
+		</form>
+	</div>
+
+	<div id="events" class="panel panel-default" th:fragment="events" >
+	
+		<!-- Default panel contents -->
+		<div class="panel-heading" th:text="${max}">MAX</div>
+
+		<table class="table table-fixed">
+			<thead>
+				<tr>
+					<th class="col-xs-2">event id</th>
+					<th class="col-xs-4">timestamp</th>
+					<th class="col-xs-4">tags</th>
+					<th class="col-xs-2">value</th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr th:each="event : ${events.data}">
+					<td class="col-xs-3" th:text="${event.id}" />
+					<td class="col-xs-3" th:text="${event.timestamp}" />
+					<td class="col-xs-3" th:text="${event.tags}" />
+					<td class="col-xs-3" th:text="${event.value}" />
+				</tr>
+			</tbody>
+		</table>
+	</div>
+
+</body>
+
+</html>
