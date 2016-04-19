@@ -3,6 +3,8 @@ package io.pivotal.tola.tsdb;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+import io.pivotal.tola.tsdb.tools.SampleGenerator;
+
 import java.time.ZonedDateTime;
 import java.util.Set;
 
@@ -18,31 +20,21 @@ public class RedisTsdb2Application implements CommandLineRunner {
 
 	@Autowired
 	private TsdbService tsdb;
+	
+	@Autowired
+	private SampleGenerator generator;
 
 	@Override
 	public void run(String... args) throws Exception {
 		
-		String[] metrics = {"temperature", "pressure"};
-		String[] regions = { "azerbaijan", "Georgia", "TuRkEy" };
-		String[] wells = { "A3", "A4", "B4", "E6", "C2" };
-
-		ZonedDateTime zdt = ZonedDateTime.now();
-		
-		// recording events
-		Event e = null;
-		for (int i = 0; i < 1000; i++) {
-			e = new Event();
-			e.setTimestamp(zdt.minusMinutes(i).toInstant());
-			e.addTags(String.format("region=%s well=%s", regions[(i % regions.length)], wells[(i % wells.length)]));
-			e.setValue(2.2d + i);
-			tsdb.recordEvent(metrics[(i % metrics.length)], e);
-		}
+		generator.oilData();
 		
 		//////////////////////////////////////
 		// TESTS
 		////////////////////////////////////
 		
-		String metric = metrics[0];
+		ZonedDateTime zdt = ZonedDateTime.now();
+		String metric = "temperature";
 
 		// getEvents
 		Set<String> eventKeys = tsdb.getEventKeys(metric, zdt.minusMinutes(5).toInstant(), zdt.toInstant());

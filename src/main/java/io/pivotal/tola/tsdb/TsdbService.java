@@ -96,7 +96,7 @@ public class TsdbService {
 			String tag = tagEntry.getKey();
 			String[] values = tagEntry.getValue().split(",");
 			for(String tagValue: values) {
-				String setKey = String.format("event:%s:%s:%s:index", metric, tag, tagValue);
+				String setKey = eventTagIndexKey(metric, tag, tagValue);
 				setKeys.add(setKey);
 			}
 		}
@@ -112,7 +112,7 @@ public class TsdbService {
 			String tag = tagEntry.getKey();
 			String[] values = tagEntry.getValue().split(",");
 			for(String tagValue: values) {
-				String setKey = String.format("event:%s:%s:%s:index", metric, tag, tagValue);
+				String setKey = eventTagIndexKey(metric, tag, tagValue);
 				result.add(tag, setKey);
 			}
 		}
@@ -208,6 +208,11 @@ public class TsdbService {
 	// in = tags -> region=georgia,turkey well=a3
 	public Set<String> getEventKeys2(String metric, String tags, Instant min, Instant max) {
 
+		if (tags == null || tags.trim().length() <=0) {
+			log.info("no tags sent");
+			return new HashSet<String>();
+		}
+		
 		String tempSet = "TEMP_"+(metric+tags+min+max).hashCode();
 		MultiValueMap<String, String>  setKeys = tags2keys2(metric, tags);
 		

@@ -51,6 +51,10 @@ public class TsdbRestController {
 	 * // http://opentsdb.net/docs/build/html/user_guide/query/dates.html s -
 	 * Seconds m - Minutes h - Hours d - Days (24 hours) w - Weeks (7 days) n -
 	 * Months (30 days) y - Years (365 days)
+	 * EQUAL = %3D
+	 * SPACE = %20
+	 * /tsdb/pressure/relative?tags=region%3dturkey&time=1h
+	 * /tsdb/pressure/relative?tags=region%3dturkey,georgia%20well%3da3&time=1h
 	 */
 	@RequestMapping(value = "/tsdb/{metric}/relative")
 	public Response getEventsRelative(@PathVariable String metric, @RequestParam(value = "tags") String tags,
