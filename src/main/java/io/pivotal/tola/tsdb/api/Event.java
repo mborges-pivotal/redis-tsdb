@@ -1,4 +1,4 @@
-package io.pivotal.tola.tsdb;
+package io.pivotal.tola.tsdb.api;
 
 import java.util.Map;
 

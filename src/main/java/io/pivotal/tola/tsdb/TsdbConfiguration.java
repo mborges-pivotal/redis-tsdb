@@ -8,6 +8,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.JacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+import io.pivotal.tola.tsdb.api.Event;
+
 @Configuration
 public class TsdbConfiguration {
 	

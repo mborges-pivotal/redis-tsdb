@@ -1,0 +1,9 @@
+---
+applications:
+- name: tsdb-api
+  memory: 512MB
+  instances: 1
+  path: target/redis-tsdb-0.0.1-SNAPSHOT.jar
+  services: [redis-tsdb]
+  env:
+    SPRING_PROFILES_ACTIVE: cloud
