@@ -7,6 +7,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.SpringApplicationConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.scripting.support.ResourceScriptSource;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import io.pivotal.tola.tsdb.api.TsdbService;
@@ -15,6 +21,7 @@ import io.pivotal.tola.tsdb.tools.SampleGenerator;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -38,6 +45,24 @@ public class ApplicationTests {
 	@Before
 	public void generateData() {
 		generator.oilGasData();
+	}
+	
+	@Autowired
+	private RedisTemplate<String, String> redisTemplate;
+
+	@Bean
+	public RedisScript<Boolean> script() {
+	  DefaultRedisScript<Boolean> redisScript = new DefaultRedisScript<Boolean>();
+	  redisScript.setScriptSource(new ResourceScriptSource(new ClassPathResource("/scripts/checkandset.lua")));
+	  redisScript.setResultType(Boolean.class);
+	  return redisScript;
+	}
+	
+	@Test
+	public void runLuaScript() throws Exception {		
+		// testing lua scripts
+		Boolean result = redisTemplate.execute(script(), Collections.singletonList("key"), "a", "b");	
+		System.out.println("#### Redis script: " + result);
 	}
 
 	//////////////////////////////////////
