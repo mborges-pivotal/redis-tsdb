@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.data.redis.support.atomic.RedisAtomicLong;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -67,14 +68,14 @@ public class TsdbService {
 		events.executePipelined(new RedisCallback<Object>() {
 			public Object doInRedis(RedisConnection connection) throws DataAccessException {
 
-				events.opsForHash().put(eventsKey(metric), eventIdKey(metric, id + ""), event);
+				events.opsForHash().put(eventsKey(metric), id+"", event);
 				eventsIndex.opsForZSet().add(eventIndexKey(metric), event.getId() + "", event.getTimestampInMillis());
 
 				// Adding index for each tag in the event
 				for (Map.Entry<String, String> tag : event.getTags().entrySet()) {
 					String key = tag.getKey();
 					String value = tag.getValue();
-					eventsIndex.opsForSet().add(eventTagIndexKey(metric, key, value), event.getId() + "");
+					eventsIndex.opsForZSet().add(eventTagIndexKey(metric, key, value), event.getId() + "", event.getTimestampInMillis());
 				}
 
 				return null;
@@ -92,18 +93,12 @@ public class TsdbService {
 	 * @return event
 	 */
 	public Event retrieveEvent(String metric, String id) {
-		return (Event) events.opsForHash().get(eventsKey(metric), eventIdKey(metric, id));
+		return (Event) events.opsForHash().get(eventsKey(metric), id);
 	}
 
 	@SuppressWarnings("unchecked")
 	public List<Event> retrieveEvents(String metric, Set<String> ids) {
-
-		Collection<Object> eventKeys = new HashSet<Object>();
-		for (String id : ids) {
-			eventKeys.add(eventIdKey(metric, id));
-		}
-
-		return (List<Event>) (List<?>) events.opsForHash().multiGet(eventsKey(metric), eventKeys);
+		return (List<Event>) (List<?>) events.opsForHash().multiGet(eventsKey(metric), (Collection<Object>)(Collection<?>)ids);
 	}
 
 	/**
@@ -167,7 +162,7 @@ public class TsdbService {
 	public Set<String> getEventKeys(String metric, Instant min, Instant max) {
 		return eventsIndex.opsForZSet().rangeByScore(eventIndexKey(metric), min.toEpochMilli(), max.toEpochMilli());
 	}
-
+	
 	/**
 	 * getEventKeys - ATTENTION, this can return a lot of data points
 	 * 
@@ -201,14 +196,13 @@ public class TsdbService {
 		String tempSet = "TEMP_" + (metric + tags + min + max).hashCode();
 		MultiValueMap<String, String> setKeys = tags2keys(metric, tags);
 
-		// Get time range
-		Set<String> r = getEventKeys(metric, min, max);
+		// Get time range and create 
+		Set<ZSetOperations.TypedTuple<String>> r = getEventKeysWithScores(metric, min, max);
 		if (r.isEmpty()) {
 			log.info("############## - EMPTY RANGE");
-			return r;
+			return new HashSet<String>();
 		}
-
-		eventsIndex.opsForSet().add(tempSet + "_PRE", r.toArray(new String[r.size()]));
+		eventsIndex.opsForZSet().add(tempSet + "_PRE", r);
 
 		// union of all values per tag
 		Set<String> tagSets = new HashSet<String>();
@@ -217,13 +211,13 @@ public class TsdbService {
 			String tempTagSet = tempSet + "_" + key;
 			tagSets.add(tempTagSet);
 			List<String> tagValues = entry.getValue();
-			eventsIndex.opsForSet().unionAndStore("dummy", tagValues, tempTagSet);
+			eventsIndex.opsForZSet().unionAndStore("dummy", tagValues, tempTagSet);
 		}
 
 		// intersect with tags keys
-		eventsIndex.opsForSet().intersectAndStore(tempSet + "_PRE", tagSets, tempSet);
-		log.info("## UNION ## " + eventsIndex.opsForSet().size(tempSet));
-		Set<String> finalResult = eventsIndex.opsForSet().members(tempSet);
+		eventsIndex.opsForZSet().intersectAndStore(tempSet + "_PRE", tagSets, tempSet);
+		log.info("## UNION ## " + eventsIndex.opsForZSet().size(tempSet));
+		Set<String> finalResult = eventsIndex.opsForZSet().range(tempSet, 0, -1);
 
 		eventsIndex.delete(tempSet + "_PRE");
 		eventsIndex.delete(tempSet);
@@ -244,9 +238,11 @@ public class TsdbService {
 		return String.format("event:%s:counter", metric);
 	}
 
+	/*
 	private static String eventIdKey(String metric, String id) {
 		return String.format("event:%s:%s", metric, id);
 	}
+	*/
 
 	private static String eventIndexKey(String metric) {
 		return String.format("event:%s:index", metric);
@@ -284,6 +280,10 @@ public class TsdbService {
 	// LUA SCRIPTS FOR AGGREGATION
 	//////////////////
 
+	private Set<ZSetOperations.TypedTuple<String>> getEventKeysWithScores(String metric, Instant min, Instant max) {
+		return eventsIndex.opsForZSet().rangeByScoreWithScores(eventIndexKey(metric), min.toEpochMilli(), max.toEpochMilli());
+	}	
+	
 	public double sumEvents(String metric, Instant min, Instant max) {
 		Set<String> eventKeys = getEventKeys(metric, min, max);
 		double total = 0;
