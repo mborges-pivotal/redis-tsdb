@@ -1,5 +1,6 @@
 package io.pivotal.tola.tsdb.api;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -30,7 +32,8 @@ public class TsdbRestController {
 
 	private Log log = LogFactory.getLog(TsdbRestController.class);
 
-	//private Response EMPTY_RESPONSE = Response.instance(new HashSet<String>());
+	// private Response EMPTY_RESPONSE = Response.instance(new
+	// HashSet<String>());
 
 	@Autowired
 	private TsdbService tsdb;
@@ -112,10 +115,12 @@ public class TsdbRestController {
 
 		Instant min = null;
 		if ((min = relativeInstant(time, max)) == null) {
+			// TODO: This call is not respecting the tags at all
 			ids = tsdb.getEventKeys(metric, tags);
-		} 
+		} else {
+			ids = tsdb.getEventKeys(metric, tags, min, max);			
+		}
 
-		ids = tsdb.getEventKeys(metric, tags, min, max);
 		List<Event> events = tsdb.retrieveEvents(metric, ids);
 
 		for (Event e : events) {
@@ -124,6 +129,26 @@ public class TsdbRestController {
 
 		return Response.instance(events);
 
+	}
+
+	/**
+	 * eventRelativeCsv download csv files for using with external applications
+	 * 
+	 * @param metric
+	 * @param tags
+	 * @param time
+	 * @return
+	 * @throws IOException
+	 */
+	@RequestMapping(value = "/tsdb/{metric}/relative.csv", method = RequestMethod.GET, produces = "text/csv")
+	public CsvResponse getEventsRelativeCsv(@PathVariable String metric, @RequestParam(value = "tags") String tags,
+			@RequestParam(value = "time", required = false) String time) throws IOException {
+	      @SuppressWarnings("unchecked")
+	      
+	      // TODO - get tag keys,values and use as part of the name
+	      
+		List<Event> allRecords = (List<Event>)getEventsRelative(metric, tags, time).getData();
+	      return new CsvResponse(allRecords, metric + ".csv");
 	}
 
 	///////////////////////////////////////////
@@ -142,11 +167,11 @@ public class TsdbRestController {
 	 * @return instant or null
 	 */
 	private Instant relativeInstant(String time, Instant max) {
-		
+
 		if (time == null) {
 			return null;
 		}
-		
+
 		Matcher m = r.matcher(time);
 
 		if (!m.find()) {

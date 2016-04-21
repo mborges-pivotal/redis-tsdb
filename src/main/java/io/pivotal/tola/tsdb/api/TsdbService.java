@@ -193,6 +193,8 @@ public class TsdbService {
 	 */
 	public Set<String> getEventKeys(String metric, String tags, Instant min, Instant max) {
 
+		Set<String> EMPTY_SET = new HashSet<String>();
+		
 		String tempSet = "TEMP_" + (metric + tags + min + max).hashCode();
 		MultiValueMap<String, String> setKeys = tags2keys(metric, tags);
 
@@ -200,7 +202,7 @@ public class TsdbService {
 		Set<ZSetOperations.TypedTuple<String>> r = getEventKeysWithScores(metric, min, max);
 		if (r.isEmpty()) {
 			log.info("############## - EMPTY RANGE");
-			return new HashSet<String>();
+			return EMPTY_SET;
 		}
 		eventsIndex.opsForZSet().add(tempSet + "_PRE", r);
 
@@ -261,6 +263,9 @@ public class TsdbService {
 	 * @return tag keys and it's values
 	 */
 	private static MultiValueMap<String, String> tags2keys(String metric, String in) {
+
+		// TODO: handle empty in
+		
 		Map<String, String> tags = Splitter.on(" ").withKeyValueSeparator("=").split(in.toLowerCase());
 
 		MultiValueMap<String, String> result = new LinkedMultiValueMap<String, String>();

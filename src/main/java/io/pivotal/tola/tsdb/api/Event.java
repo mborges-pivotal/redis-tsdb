@@ -1,5 +1,7 @@
 package io.pivotal.tola.tsdb.api;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -35,6 +37,15 @@ public class Event implements Serializable {
 	// region=4 well=X"
 	public void addTags(String tagList) {
 		tags = splitToMap(tagList);
+	}
+	
+	// Use by CSVWriter
+	public String[] toStringArray() {
+		List<String> l = new ArrayList<String>();
+		l.add(getTimestampInMillis()+"");
+		l.add(value+"");
+		l.add(tags.toString());
+		return l.toArray(new String[l.size()]);
 	}
 	
 	/////////////////////////////////////

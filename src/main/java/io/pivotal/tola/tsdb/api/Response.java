@@ -21,6 +21,8 @@ public class Response {
 		this.data = data;
 	}
 	
+	////////////////////
+	
 	public static Response instance(Object data) {
 		return new Response(data);
 	}
