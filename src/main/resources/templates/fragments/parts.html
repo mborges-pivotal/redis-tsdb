@@ -81,23 +81,19 @@
 	<div id="events" class="panel panel-default" th:fragment="events" >
 	
 		<!-- Default panel contents -->
-		<div class="panel-heading" th:text="${max}">MAX</div>
+		<div class="panel-heading" th:text="${'Max time ' + max + ', tags ' + tags}">MAX</div>
 
 		<table class="table table-fixed">
 			<thead>
 				<tr>
-					<th class="col-xs-2">event id</th>
 					<th class="col-xs-4">timestamp</th>
-					<th class="col-xs-4">tags</th>
 					<th class="col-xs-2">value</th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr th:each="event : ${events.data}">
-					<td class="col-xs-3" th:text="${event.id}" />
-					<td class="col-xs-3" th:text="${event.timestamp}" />
-					<td class="col-xs-3" th:text="${event.tags}" />
-					<td class="col-xs-3" th:text="${event.value}" />
+					<td class="col-xs-4" th:text="${event.timestamp}" />
+					<td class="col-xs-2" th:text="${event.value}" />
 				</tr>
 			</tbody>
 		</table>

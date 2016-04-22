@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -131,7 +131,7 @@ public class TsdbRestController {
 	      
 	      // TODO - get tag keys,values and use as part of the name
 	      
-		List<Event> allRecords = (List<Event>)getEventsRelative(metric, tags, time, sampler).getData();
+		Set<Event> allRecords = (Set<Event>)getEventsRelative(metric, tags, time, sampler).getData();
 	      return new CsvResponse(allRecords, metric + ".csv");
 	}
 

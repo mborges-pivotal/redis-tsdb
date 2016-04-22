@@ -1,6 +1,7 @@
 package io.pivotal.tola.tsdb.api;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +27,17 @@ public class Event implements Serializable {
 	private Map<String,String> tags;
 	private double value;
 	
+	// no args
+	public Event() {
+		
+	}
+	
+	////////////////////////////////////////////
+	
+	public void resetTags() {
+		tags = new HashMap<String, String>();
+	}
+	
 	public long getTimestampInMillis() {
 		return getTimestamp().toEpochMilli();
 	}
@@ -46,7 +58,7 @@ public class Event implements Serializable {
 	// Use by CSVWriter
 	public String[] toStringArray() {
 		List<String> l = new ArrayList<String>();
-		l.add(getTimestampInMillis()+"");
+		l.add(geTimestampInSeconds()+"");
 		l.add(value+"");
 		l.add(tags.toString());
 		return l.toArray(new String[l.size()]);

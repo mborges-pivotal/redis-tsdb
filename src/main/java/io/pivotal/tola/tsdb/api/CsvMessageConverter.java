@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.Charset;
-import java.util.List;
+import java.util.Set;
 
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpOutputMessage;
@@ -35,9 +35,8 @@ public class CsvMessageConverter extends AbstractHttpMessageConverter<CsvRespons
 		output.getHeaders().set("Content-Disposition", "attachment; filename=\"" + response.getFilename() + "\"");
 		OutputStream out = output.getBody();
 		CSVWriter writer = new CSVWriter(new OutputStreamWriter(out), '\t', CSVWriter.NO_QUOTE_CHARACTER);
-		List<Event> allRecords = response.getRecords();
-		for (int i = 1; i < allRecords.size(); i++) {
-			Event event = allRecords.get(i);
+		Set<Event> allRecords = response.getRecords();
+		for (Event event: allRecords) {
 			writer.writeNext(event.toStringArray());
 		}
 		writer.close();

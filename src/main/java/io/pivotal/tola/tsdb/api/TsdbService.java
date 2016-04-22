@@ -1,6 +1,7 @@
 package io.pivotal.tola.tsdb.api;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -36,8 +37,8 @@ import org.springframework.data.redis.core.RedisCallback;
  *
  * Sample of data points – temperature (metric)
  * 
- * 30 | 2016-04-19T16:39:53.972Z | {region=georgia, well=e6} | 61.2
- * 50 | 2016-04-19T16:45:53.972Z | {region=georgia, well=a2} | 41.2
+ * 30 | 2016-04-19T16:39:53.972Z | {region=georgia, well=e6} | 61.2 50 |
+ * 2016-04-19T16:45:53.972Z | {region=georgia, well=a2} | 41.2
  *
  * @author mborges
  *
@@ -70,14 +71,15 @@ public class TsdbService {
 		events.executePipelined(new RedisCallback<Object>() {
 			public Object doInRedis(RedisConnection connection) throws DataAccessException {
 
-				events.opsForHash().put(eventsKey(metric), id+"", event);
+				events.opsForHash().put(eventsKey(metric), id + "", event);
 				eventsIndex.opsForZSet().add(eventIndexKey(metric), event.getId() + "", event.getTimestampInMillis());
 
 				// Adding index for each tag in the event
 				for (Map.Entry<String, String> tag : event.getTags().entrySet()) {
 					String key = tag.getKey();
 					String value = tag.getValue();
-					eventsIndex.opsForZSet().add(eventTagIndexKey(metric, key, value), event.getId() + "", event.getTimestampInMillis());
+					eventsIndex.opsForZSet().add(eventTagIndexKey(metric, key, value), event.getId() + "",
+							event.getTimestampInMillis());
 				}
 
 				return null;
@@ -100,7 +102,8 @@ public class TsdbService {
 
 	@SuppressWarnings("unchecked")
 	public List<Event> retrieveEvents(String metric, Set<String> ids) {
-		return (List<Event>) (List<?>) events.opsForHash().multiGet(eventsKey(metric), (Collection<Object>)(Collection<?>)ids);
+		return (List<Event>) (List<?>) events.opsForHash().multiGet(eventsKey(metric),
+				(Collection<Object>) (Collection<?>) ids);
 	}
 
 	/**
@@ -164,7 +167,7 @@ public class TsdbService {
 	public Set<String> getEventKeys(String metric, Instant min, Instant max) {
 		return eventsIndex.opsForZSet().rangeByScore(eventIndexKey(metric), min.toEpochMilli(), max.toEpochMilli());
 	}
-	
+
 	/**
 	 * getEventKeys - ATTENTION, this can return a lot of data points
 	 * 
@@ -191,25 +194,23 @@ public class TsdbService {
 	 * @param max
 	 *            - end of the time window
 	 * 
-	 * Order of operations
+	 *            Order of operations
 	 * 
-	 * 1- Grouping
-	 * 2- Down Sampling
-	 * 3- Interpolation
-	 * 4- Aggregation
-	 * 5- Rate Calculation	 
+	 *            1- Grouping 2- Down Sampling 3- Interpolation 4- Aggregation
+	 *            5- Rate Calculation
 	 * 
 	 * @return
 	 */
 	public Set<Event> getEvents(String metric, String tags, Instant min, Instant max, long sampler) {
 
 		Set<Event> EMPTY_SET = new HashSet<Event>();
-		
+
 		String tempSet = "TEMP_" + (metric + tags + min + max).hashCode();
 		MultiValueMap<String, String> setKeys = tags2keys(metric, tags);
 
-		// Get time range and create 
-		// creates an set with all Keys and scores based on the range (from metric index)
+		// Get time range and create
+		// creates an set with all Keys and scores based on the range (from
+		// metric index)
 		// e.g. TEMP_hashcode
 		Set<ZSetOperations.TypedTuple<String>> r = getEventKeysWithScores(metric, min, max);
 		if (r.isEmpty()) {
@@ -223,12 +224,18 @@ public class TsdbService {
 		/////////////////////////////////
 		// union of all values per tag
 		// creates sorted sets per tag key. e.g hascode_tagKey
+		
+		int totalTagValues = 0;
+		
 		Set<String> groupSets = new HashSet<String>();
 		for (Map.Entry<String, List<String>> entry : setKeys.entrySet()) {
 			String key = entry.getKey();
 			String groupSet = tempSet + "_" + key; // GROUP SET
 			groupSets.add(groupSet);
 			List<String> tagValues = entry.getValue(); // all values for a tagKey
+			
+			totalTagValues += tagValues.size();
+			
 			eventsIndex.opsForZSet().unionAndStore("dummy", tagValues, groupSet);
 		}
 
@@ -238,19 +245,24 @@ public class TsdbService {
 		Set<String> finalResult = eventsIndex.opsForZSet().range(tempSet, 0, -1);
 
 		/////////////////////////////////
-		// #2 - DOWNSAMPLING - 1s-avg (Final set)
+		// #2 - DOWNSAMPLING AVG
 		/////////////////////////////////
-		// Eliminate eventId, by downsampling into one based on the time interval
+		// Eliminate eventId, by downsampling into one based on the time
+		///////////////////////////////// interval
 		// for now use avg function and 1 second
 		// timestamp - (timestamp % interval_ms)
-		Set<Event> finalResultDs = new LinkedHashSet<Event>(finalResult.size());
+
+		Set<Event> finalResultDs = new LinkedHashSet<Event>();
 		Map<String, DownSampler> dsValue = new LinkedHashMap<String, DownSampler>();
-		
+
+		// Use for interpolation
+		Map<Long, Set<Event>> alignedSeries = new LinkedHashMap<Long, Set<Event>>();
+
 		long current_ds = 0;
-		for(String id: finalResult) {
+		for (String id : finalResult) {
 			Event e = retrieveEvent(metric, id);
 			long ds_ts = e.getTimestampInMillis() - (e.getTimestampInMillis() % sampler);
-			
+
 			// current downsample time based on the event
 			DownSampler d = dsValue.get(e.getTags().toString());
 			if (d == null) {
@@ -258,12 +270,15 @@ public class TsdbService {
 				dsValue.put(e.getTags().toString(), d);
 			}
 			current_ds = d.getCurrent_ds();
-			
+
 			// calculate downsampler
-			if (current_ds != ds_ts){
-				System.out.println("------ Change for " + e.getTags());
+			if (current_ds != ds_ts) {
 				d = dsValue.remove(e.getTags().toString());
+
 				finalResultDs.add(d.getDownSamplerEvent(current_ds));
+				alignedSeries.put(current_ds, finalResultDs);
+				finalResultDs = new LinkedHashSet<Event>();
+
 				current_ds = ds_ts;
 			}
 
@@ -272,21 +287,58 @@ public class TsdbService {
 			if (d != null) {
 				dsValue.computeIfPresent(e.getTags().toString(), (a, b) -> b.add(e.getValue()));
 			}
-			
-			System.out.println(e.getTimestampInMillis() + " -> " + ds_ts + " : " + e.getTags() + " : " + e.getTimestamp() + " : "+ e.getValue());
-		}
+
+		} // downsampling
 
 		// Applying the left over downsamplers
-		System.out.println(" ---- Remainer DownSampler ----");
-		for(DownSampler d: dsValue.values()) {
+		for (DownSampler d : dsValue.values()) {
 			finalResultDs.add(d.getDownSamplerEvent(d.getCurrent_ds()));
 		}
 
+		// Adding last timebucket
+		if (current_ds != (Long) alignedSeries.keySet().toArray()[alignedSeries.size() - 1]) {
+			alignedSeries.put(current_ds, finalResultDs);
+			finalResultDs = new LinkedHashSet<Event>();
+		}
+
+		System.out.println("TotalTagValues: " + totalTagValues);
+		System.out.println(alignedSeries.keySet());
+
+	
+		
+		/////////////////////////////////
+		// #3 - INTERPOLATION - AVG
+		/////////////////////////////////
+		// Not sure how to address the gaps across multiple series
+
+
+		/////////////////////////////////
+		// #4 - AGGREGATION - AVG
+		/////////////////////////////////
+		// AVG should be fine without interporlation
+		for (Set<Event> s : alignedSeries.values()) {
+			int counter = 0;
+			double total = 0;
+			Event lEvent = null;
+			for (Event e : s) {
+				lEvent = e;
+				counter++;
+				total += e.getValue();
+			}
+
+			lEvent.setValue(total / counter); // avg
+			lEvent.setId(0);
+			//lEvent.resetTags();
+			lEvent.addTags(tags);
+
+			finalResultDs.add(lEvent);
+		}
+
 		System.out.println(" ---- Final Set ----");
-		for(Event e: finalResultDs) {
+		for (Event e : finalResultDs) {
 			System.out.println(e);
 		}
-		
+
 		eventsIndex.delete(tempSet + "_PRE");
 		eventsIndex.delete(tempSet);
 		eventsIndex.delete(groupSets);
@@ -307,10 +359,9 @@ public class TsdbService {
 	}
 
 	/*
-	private static String eventIdKey(String metric, String id) {
-		return String.format("event:%s:%s", metric, id);
-	}
-	*/
+	 * private static String eventIdKey(String metric, String id) { return
+	 * String.format("event:%s:%s", metric, id); }
+	 */
 
 	private static String eventIndexKey(String metric) {
 		return String.format("event:%s:index", metric);
@@ -324,14 +375,15 @@ public class TsdbService {
 	 * tags2keys - parse tag String
 	 * 
 	 * @param metric
-	 * @param in - tag string. e.g. region=georgia,turkey well=a3
+	 * @param in
+	 *            - tag string. e.g. region=georgia,turkey well=a3
 	 * 
 	 * @return tag keys and it's values
 	 */
 	private static MultiValueMap<String, String> tags2keys(String metric, String in) {
 
 		// TODO: handle empty in
-		
+
 		Map<String, String> tags = Splitter.on(" ").withKeyValueSeparator("=").split(in.toLowerCase());
 
 		MultiValueMap<String, String> result = new LinkedMultiValueMap<String, String>();
@@ -352,9 +404,10 @@ public class TsdbService {
 	//////////////////
 
 	private Set<ZSetOperations.TypedTuple<String>> getEventKeysWithScores(String metric, Instant min, Instant max) {
-		return eventsIndex.opsForZSet().rangeByScoreWithScores(eventIndexKey(metric), min.toEpochMilli(), max.toEpochMilli());
-	}	
-	
+		return eventsIndex.opsForZSet().rangeByScoreWithScores(eventIndexKey(metric), min.toEpochMilli(),
+				max.toEpochMilli());
+	}
+
 	public double sumEvents(String metric, Instant min, Instant max) {
 		Set<String> eventKeys = getEventKeys(metric, min, max);
 		double total = 0;

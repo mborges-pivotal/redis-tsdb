@@ -1,6 +1,6 @@
 package io.pivotal.tola.tsdb.api;
 
-import java.util.List;
+import java.util.Set;
 
 /**
  * CvsResponse - Used by the HttpMessageConverter
@@ -11,9 +11,9 @@ import java.util.List;
 public class CsvResponse {
 
 	private final String filename;
-	private final List<Event> records;
+	private final Set<Event> records;
 
-	public CsvResponse(List<Event> records, String filename) {
+	public CsvResponse(Set<Event> records, String filename) {
 	       this.records = records;
 	       this.filename = filename;
 	   }
@@ -22,7 +22,7 @@ public class CsvResponse {
 		return filename;
 	}
 
-	public List<Event> getRecords() {
+	public Set<Event> getRecords() {
 		return records;
 	}
 

@@ -96,6 +96,7 @@ public class WebController {
 		char sampler = paramMap.containsKey("sampler") ? paramMap.get("sampler")[0].charAt(0) : 's';
 
 		model.addAttribute("max", Instant.now());
+		model.addAttribute("tags", tags);
 
 		Response r = api.getEventsRelative(paramMap.get("metric")[0], tags.trim(), time, sampler);
 		model.addAttribute("events", r);
