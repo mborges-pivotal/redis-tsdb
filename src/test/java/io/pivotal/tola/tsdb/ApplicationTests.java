@@ -15,6 +15,7 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.scripting.support.ResourceScriptSource;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
+import io.pivotal.tola.tsdb.api.Event;
 import io.pivotal.tola.tsdb.api.TsdbService;
 import io.pivotal.tola.tsdb.tools.SampleGenerator;
 
@@ -100,17 +101,11 @@ public class ApplicationTests {
 		String metric = "temperature";
 
 		// QUERIES
-		Set<String> result = tsdb.getEventKeys(metric, "region=georgia", zdt.minusMinutes(5).toInstant(),
-				zdt.toInstant());
+		Set<Event> result = tsdb.getEvents(metric, "region=georgia", zdt.minusMinutes(5).toInstant(),
+				zdt.toInstant(), 'h');
 		log.info(result);
 		log.info(result.size());
-		log.info(tsdb.retrieveEvents(metric, result));
-
-		// QUERIES
-		result = tsdb.getEventKeys(metric, "region=georgia", zdt.minusMinutes(5).toInstant(), zdt.toInstant());
 		log.info(result);
-		log.info(result.size());
-		log.info(tsdb.retrieveEvents(metric, result));
 
 	}
 
@@ -120,11 +115,11 @@ public class ApplicationTests {
 		String metric = "temperature";
 
 		// QUERIES
-		Set<String> result = tsdb.getEventKeys(metric, "region=georgia,turkey well=a3,a4,b4",
-				zdt.minusMinutes(5).toInstant(), zdt.toInstant());
+		Set<Event> result = tsdb.getEvents(metric, "region=georgia,turkey well=a3,a4,b4",
+				zdt.minusMinutes(5).toInstant(), zdt.toInstant(), 'm');
 		log.info(result);
 		log.info(result.size());
-		log.info(tsdb.retrieveEvents(metric, result));
+		log.info(result);
 
 	}
 	

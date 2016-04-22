@@ -30,6 +30,10 @@ public class Event implements Serializable {
 		return getTimestamp().toEpochMilli();
 	}
 	
+	public long geTimestampInSeconds() {
+		return getTimestamp().getEpochSecond();
+	}
+	
 	public void addTag(String key, String value) {
 		tags.put(key,  value);
 	}

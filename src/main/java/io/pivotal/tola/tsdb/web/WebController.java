@@ -79,7 +79,7 @@ public class WebController {
 		for (Map.Entry<String, String[]> entry : paramMap.entrySet()) {
 			String key = entry.getKey();
 			String[] values = entry.getValue();
-			if (!"metric|amount|unit".contains(key)) {
+			if (!"metric|amount|unit|sampler".contains(key)) {
 				String tag = key + "=";
 				for (int i = 0; i < values.length; i++) {
 					if (i > 0) {
@@ -93,10 +93,11 @@ public class WebController {
 		}
 
 		String time = paramMap.get("amount")[0] + paramMap.get("unit")[0];
+		char sampler = paramMap.containsKey("sampler") ? paramMap.get("sampler")[0].charAt(0) : 's';
 
 		model.addAttribute("max", Instant.now());
 
-		Response r = api.getEventsRelative(paramMap.get("metric")[0], tags.trim(), time);
+		Response r = api.getEventsRelative(paramMap.get("metric")[0], tags.trim(), time, sampler);
 		model.addAttribute("events", r);
 
 		return "fragments/parts :: events";

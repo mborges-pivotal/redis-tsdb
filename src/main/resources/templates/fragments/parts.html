@@ -55,6 +55,19 @@
 			</div>
 
 			<div class="form-group">
+				<label class="col-xs-3 control-label">DownSampler (Avg)</label>
+				<div class="col-xs-5 selectContainer">
+					<label class="radio-inline active"> <input checked="true"
+						type="radio" name="sampler" id="unitH" value="h"> Hour(s) </input>
+					</label> <label class="radio-inline"> <input type="radio"
+						name="sampler" id="unitM" value="m"> Minute(s) </input>
+					</label> <label class="radio-inline"> <input type="radio"
+						name="sampler" id="unitS" value="s"> Second(s) </input>
+					</label>
+				</div>
+			</div>
+
+			<div class="form-group">
 				<div class="col-xs-5 col-xs-offset-3">
 					<a type="submit" href="javascript: graph()"
 						class="btn btn-primary center-block">Time Series</a>

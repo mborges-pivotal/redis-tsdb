@@ -5,7 +5,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,7 +17,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -106,28 +104,14 @@ public class TsdbRestController {
 	 */
 	@RequestMapping(value = "/tsdb/{metric}/relative")
 	public Response getEventsRelative(@PathVariable String metric, @RequestParam(value = "tags") String tags,
-			@RequestParam(value = "time", required = false) String time) {
+			@RequestParam(value = "time", required = false) String time, @RequestParam(value = "sampler", required = false) char sampler) {
 
 		Instant max = Instant.now();
-		Set<String> ids = null;
-
 		log.info(String.format("Running event query for metric %s, tags %s with time %s", metric, tags, time));
 
-		Instant min = null;
-		if ((min = relativeInstant(time, max)) == null) {
-			// TODO: This call is not respecting the tags at all
-			ids = tsdb.getEventKeys(metric, tags);
-		} else {
-			ids = tsdb.getEventKeys(metric, tags, min, max);			
-		}
-
-		List<Event> events = tsdb.retrieveEvents(metric, ids);
-
-		for (Event e : events) {
-			log.info(e);
-		}
-
-		return Response.instance(events);
+		Instant min = relativeInstant(time, max);
+		
+		return Response.instance(tsdb.getEvents(metric, tags, min, max, DownSampler.getDownSampler(sampler)));
 
 	}
 
@@ -142,12 +126,12 @@ public class TsdbRestController {
 	 */
 	@RequestMapping(value = "/tsdb/{metric}/relative.csv", method = RequestMethod.GET, produces = "text/csv")
 	public CsvResponse getEventsRelativeCsv(@PathVariable String metric, @RequestParam(value = "tags") String tags,
-			@RequestParam(value = "time", required = false) String time) throws IOException {
+			@RequestParam(value = "time", required = false) String time, @RequestParam(value = "sampler", required = false) char sampler) throws IOException {
 	      @SuppressWarnings("unchecked")
 	      
 	      // TODO - get tag keys,values and use as part of the name
 	      
-		List<Event> allRecords = (List<Event>)getEventsRelative(metric, tags, time).getData();
+		List<Event> allRecords = (List<Event>)getEventsRelative(metric, tags, time, sampler).getData();
 	      return new CsvResponse(allRecords, metric + ".csv");
 	}
 
@@ -168,8 +152,9 @@ public class TsdbRestController {
 	 */
 	private Instant relativeInstant(String time, Instant max) {
 
+		// default for 1 day
 		if (time == null) {
-			return null;
+			time = "1d";
 		}
 
 		Matcher m = r.matcher(time);

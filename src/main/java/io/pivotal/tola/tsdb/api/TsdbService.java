@@ -3,6 +3,8 @@ package io.pivotal.tola.tsdb.api;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -189,16 +191,26 @@ public class TsdbService {
 	 * @param max
 	 *            - end of the time window
 	 * 
+	 * Order of operations
+	 * 
+	 * 1- Grouping
+	 * 2- Down Sampling
+	 * 3- Interpolation
+	 * 4- Aggregation
+	 * 5- Rate Calculation	 
+	 * 
 	 * @return
 	 */
-	public Set<String> getEventKeys(String metric, String tags, Instant min, Instant max) {
+	public Set<Event> getEvents(String metric, String tags, Instant min, Instant max, long sampler) {
 
-		Set<String> EMPTY_SET = new HashSet<String>();
+		Set<Event> EMPTY_SET = new HashSet<Event>();
 		
 		String tempSet = "TEMP_" + (metric + tags + min + max).hashCode();
 		MultiValueMap<String, String> setKeys = tags2keys(metric, tags);
 
 		// Get time range and create 
+		// creates an set with all Keys and scores based on the range (from metric index)
+		// e.g. TEMP_hashcode
 		Set<ZSetOperations.TypedTuple<String>> r = getEventKeysWithScores(metric, min, max);
 		if (r.isEmpty()) {
 			log.info("############## - EMPTY RANGE");
@@ -206,26 +218,80 @@ public class TsdbService {
 		}
 		eventsIndex.opsForZSet().add(tempSet + "_PRE", r);
 
+		/////////////////////////////////
+		// #1 - GROUPING
+		/////////////////////////////////
 		// union of all values per tag
-		Set<String> tagSets = new HashSet<String>();
+		// creates sorted sets per tag key. e.g hascode_tagKey
+		Set<String> groupSets = new HashSet<String>();
 		for (Map.Entry<String, List<String>> entry : setKeys.entrySet()) {
 			String key = entry.getKey();
-			String tempTagSet = tempSet + "_" + key;
-			tagSets.add(tempTagSet);
-			List<String> tagValues = entry.getValue();
-			eventsIndex.opsForZSet().unionAndStore("dummy", tagValues, tempTagSet);
+			String groupSet = tempSet + "_" + key; // GROUP SET
+			groupSets.add(groupSet);
+			List<String> tagValues = entry.getValue(); // all values for a tagKey
+			eventsIndex.opsForZSet().unionAndStore("dummy", tagValues, groupSet);
 		}
 
 		// intersect with tags keys
-		eventsIndex.opsForZSet().intersectAndStore(tempSet + "_PRE", tagSets, tempSet);
+		eventsIndex.opsForZSet().intersectAndStore(tempSet + "_PRE", groupSets, tempSet);
 		log.info("## UNION ## " + eventsIndex.opsForZSet().size(tempSet));
 		Set<String> finalResult = eventsIndex.opsForZSet().range(tempSet, 0, -1);
 
+		/////////////////////////////////
+		// #2 - DOWNSAMPLING - 1s-avg (Final set)
+		/////////////////////////////////
+		// Eliminate eventId, by downsampling into one based on the time interval
+		// for now use avg function and 1 second
+		// timestamp - (timestamp % interval_ms)
+		Set<Event> finalResultDs = new LinkedHashSet<Event>(finalResult.size());
+		Map<String, DownSampler> dsValue = new LinkedHashMap<String, DownSampler>();
+		
+		long current_ds = 0;
+		for(String id: finalResult) {
+			Event e = retrieveEvent(metric, id);
+			long ds_ts = e.getTimestampInMillis() - (e.getTimestampInMillis() % sampler);
+			
+			// current downsample time based on the event
+			DownSampler d = dsValue.get(e.getTags().toString());
+			if (d == null) {
+				d = new DownSampler(e, ds_ts);
+				dsValue.put(e.getTags().toString(), d);
+			}
+			current_ds = d.getCurrent_ds();
+			
+			// calculate downsampler
+			if (current_ds != ds_ts){
+				System.out.println("------ Change for " + e.getTags());
+				d = dsValue.remove(e.getTags().toString());
+				finalResultDs.add(d.getDownSamplerEvent(current_ds));
+				current_ds = ds_ts;
+			}
+
+			// add or calculate event value
+			d = dsValue.putIfAbsent(e.getTags().toString(), new DownSampler(e, current_ds));
+			if (d != null) {
+				dsValue.computeIfPresent(e.getTags().toString(), (a, b) -> b.add(e.getValue()));
+			}
+			
+			System.out.println(e.getTimestampInMillis() + " -> " + ds_ts + " : " + e.getTags() + " : " + e.getTimestamp() + " : "+ e.getValue());
+		}
+
+		// Applying the left over downsamplers
+		System.out.println(" ---- Remainer DownSampler ----");
+		for(DownSampler d: dsValue.values()) {
+			finalResultDs.add(d.getDownSamplerEvent(d.getCurrent_ds()));
+		}
+
+		System.out.println(" ---- Final Set ----");
+		for(Event e: finalResultDs) {
+			System.out.println(e);
+		}
+		
 		eventsIndex.delete(tempSet + "_PRE");
 		eventsIndex.delete(tempSet);
-		eventsIndex.delete(tagSets);
+		eventsIndex.delete(groupSets);
 
-		return finalResult;
+		return finalResultDs;
 	}
 
 	//////////////////
