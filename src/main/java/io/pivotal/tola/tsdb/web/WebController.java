@@ -57,6 +57,9 @@ public class WebController {
 		model.addAttribute("metrics", metrics);
 		model.addAttribute("tags", tsdb.getMetricTags(metrics.iterator().next()));
 		model.addAttribute("events", Response.instance(new HashSet<String>()));
+		
+		model.addAttribute("max", Instant.now());
+		
 		return "index";
 	}
 

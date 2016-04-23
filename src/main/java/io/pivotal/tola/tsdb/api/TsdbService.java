@@ -205,6 +205,10 @@ public class TsdbService {
 
 		Set<Event> EMPTY_SET = new HashSet<Event>();
 
+		if (tags.length() <= 0) {
+			return EMPTY_SET;
+		}
+		
 		String tempSet = "TEMP_" + (metric + tags + min + max).hashCode();
 		MultiValueMap<String, String> setKeys = tags2keys(metric, tags);
 
