@@ -300,7 +300,7 @@ public class TsdbService {
 		}
 
 		// Adding last timebucket
-		if (current_ds != (Long) alignedSeries.keySet().toArray()[alignedSeries.size() - 1]) {
+		if (alignedSeries.size() > 0 && current_ds != (Long) alignedSeries.keySet().toArray()[alignedSeries.size() - 1]) {
 			alignedSeries.put(current_ds, finalResultDs);
 			finalResultDs = new LinkedHashSet<Event>();
 		}

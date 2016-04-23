@@ -86,14 +86,14 @@
 		<table class="table table-fixed">
 			<thead>
 				<tr>
-					<th class="col-xs-4">timestamp</th>
-					<th class="col-xs-2">value</th>
+					<th class="col-xs-6">timestamp</th>
+					<th class="col-xs-6">value</th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr th:each="event : ${events.data}">
-					<td class="col-xs-4" th:text="${event.timestamp}" />
-					<td class="col-xs-2" th:text="${event.value}" />
+					<td class="col-xs-6" th:text="${event.timestamp}" />
+					<td class="col-xs-6" th:text="${event.value}" />
 				</tr>
 			</tbody>
 		</table>
